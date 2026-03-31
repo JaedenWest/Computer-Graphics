@@ -1,10 +1,11 @@
 //---------------------------------------
 // Program: Homework4.cpp
-// Purpose: minecraft dirt block 
+// Purpose: texture mapping 
 // Author:  Jaeden West
 // Date:    3/26/2026
 //---------------------------------------
 #include <math.h>
+#include <vector>
 #include <stdio.h>
 #include <stdlib.h>
 #ifdef MAC
@@ -17,130 +18,181 @@
 // Global variables 
 #define ROTATE 1
 #define TRANSLATE 2
-int xangle = 10;
-int yangle = 10;
-int zangle = 10;
-int xpos = 0;
-int ypos = 0;
-int zpos = 0;
 int mode = ROTATE;
 
-   int xdim, ydim;
-   unsigned char *texture1;
-   unsigned char *texture2;
+int xangle = 10, yangle = 10, zangle = 10;
+int xpos = 0, ypos = 0, zpos = 0;
+float dt = 0.01;
 
-//---------------------------------------
-// Initialize texture image
-//---------------------------------------
-void init_texture(char *name, unsigned char *&texture, int &xdim, int &ydim)
-{
-   // Read jpg image
-   im_color image;
-   image.ReadJpg(name);
-   printf("Reading image %s\n", name);
-   xdim = 1; while (xdim < image.R.Xdim) xdim*=2; xdim /=2;
-   ydim = 1; while (ydim < image.R.Ydim) ydim*=2; ydim /=2;
-   image.Interpolate(xdim, ydim);
-   printf("Interpolating %dx%d to %dx%d\n", 
-      image.R.Xdim, image.R.Ydim, xdim, ydim);
 
-   // Copy image into texture array
-   texture = (unsigned char *)malloc((unsigned int)(xdim*ydim*3));
-   int index = 0;
-   for (int y = 0; y < ydim; y++)
-      for (int x = 0; x < xdim; x++)
+class Block{
+      //texture data
+      unsigned char* texture; // 1D array of RGB values
+      int xdim, ydim;
+   public:
+      //object transformaition
+      float Px, Py, Pz;
+      float Ax, Ay, Az;
+      //velocity
+      float Vx, Vy, Vz;
+
+      //constructor
+      Block(const char* filename, float px = 0, float py = 0, float pz = 0)
       {
-         texture[index++] = (unsigned char)(image.R.Data2D[y][x]);
-         texture[index++] = (unsigned char)(image.G.Data2D[y][x]);
-         texture[index++] = (unsigned char)(image.B.Data2D[y][x]);
+            Px = px;
+            Py = py;
+            Pz = pz;
+            Ax = 0;
+            Ay = 0;
+            Az = 0;
+            Vx = 0.0f;
+            Vy = 0.0f;
+            Vz = 0.0f;
+            init_texture(filename);
+
       }
-}
+      //intialize texture
+      void init_texture(const char* filename)
+      {
+         // Read jpg image
+         im_color image;
+         image.ReadJpg(filename);
+         printf("Reading image %s\n", filename);
+         xdim = 1; while (xdim < image.R.Xdim) xdim*=2; xdim /=2;
+         ydim = 1; while (ydim < image.R.Ydim) ydim*=2; ydim /=2;
+         image.Interpolate(xdim, ydim);
+         printf("Interpolating %dx%d to %dx%d\n", 
+            image.R.Xdim, image.R.Ydim, xdim, ydim);
 
-//---------------------------------------
-// Function to draw 3D block
-//---------------------------------------
-void block(float xmin, float ymin, float zmin,
-           float xmax, float ymax, float zmax)
-{
-   // Define 8 vertices
-   float ax = xmin, ay = ymin, az = zmax;
-   float bx = xmax, by = ymin, bz = zmax;
-   float cx = xmax, cy = ymax, cz = zmax;
-   float dx = xmin, dy = ymax, dz = zmax;
+         // Copy image into texture array
+         texture = (unsigned char *)malloc((unsigned int)(xdim*ydim*3));
+         int index = 0;
+         for (int y = 0; y < ydim; y++)
+            for (int x = 0; x < xdim; x++)
+            {
+               texture[index++] = (unsigned char)(image.R.Data2D[y][x]);
+               texture[index++] = (unsigned char)(image.G.Data2D[y][x]);
+               texture[index++] = (unsigned char)(image.B.Data2D[y][x]);
+            }
+      }
+      void draw()
+      {
+        glPushMatrix();
 
-   float ex = xmin, ey = ymin, ez = zmin;
-   float fx = xmax, fy = ymin, fz = zmin;
-   float gx = xmax, gy = ymax, gz = zmin;
-   float hx = xmin, hy = ymax, hz = zmin;
+        // Apply translation & rotation
+        glTranslatef(Px, Py, Pz);
+        glRotatef(Ax, 1, 0, 0);
+        glRotatef(Ay, 0, 1, 0);
+        glRotatef(Az, 0, 0, 1);
 
-   // Draw 6 faces
-   glBegin(GL_POLYGON);  // Max texture coord 1.0
-   glTexCoord2f(0.0, 0.0);
-   glVertex3f(ax, ay, az);
-   glTexCoord2f(1.0, 0.0);
-   glVertex3f(bx, by, bz);
-   glTexCoord2f(1.0, 1.0);
-   glVertex3f(cx, cy, cz);
-   glTexCoord2f(0.0, 1.0);
-   glVertex3f(dx, dy, dz);
-   glEnd();
+        // Bind texture
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, xdim, ydim, 0, GL_RGB, GL_UNSIGNED_BYTE, texture);
 
-   glBegin(GL_POLYGON);  // Max texture coord 1.0
-   glTexCoord2f(0.0, 0.0);
-   glVertex3f(ex, ey, ez);
-   glTexCoord2f(1.0, 0.0);
-   glVertex3f(ax, ay, az);
-   glTexCoord2f(1.0, 1.0);
-   glVertex3f(dx, dy, dz);
-   glTexCoord2f(0.0, 1.0);
-   glVertex3f(hx, hy, hz);
-   glEnd();
+        // Draw cube
+        block(-1, -1, -1, 1, 1, 1);
 
-   glBegin(GL_POLYGON);  // Max texture coord 1.0
-   glTexCoord2f(0.0, 0.0);
-   glVertex3f(fx, fy, fz);
-   glTexCoord2f(1.0, 0.0);
-   glVertex3f(ex, ey, ez);
-   glTexCoord2f(1.0, 1.0);
-   glVertex3f(hx, hy, hz);
-   glTexCoord2f(0.0, 1.0);
-   glVertex3f(gx, gy, gz);
-   glEnd();
+        glPopMatrix();
+      }
 
-   glBegin(GL_POLYGON);  // Max texture coord 1.0
-   glTexCoord2f(0.0, 0.0);
-   glVertex3f(bx, by, bz);
-   glTexCoord2f(1.0, 0.0);
-   glVertex3f(fx, fy, fz);
-   glTexCoord2f(1.0, 1.0);
-   glVertex3f(gx, gy, gz);
-   glTexCoord2f(0.0, 1.0);
-   glVertex3f(cx, cy, cz);
-   glEnd();
+      void update()
+      {
+         Px += Vx * dt;
+         Py += Vy * dt;
+         Pz += Vz * dt;
 
-   glBegin(GL_POLYGON);  // Max texture coord 3.0
-   glTexCoord2f(0.0, 0.0);
-   glVertex3f(ax, ay, az);
-   glTexCoord2f(2.0, 0.0);
-   glVertex3f(ex, ey, ez);
-   glTexCoord2f(2.0, 2.0);
-   glVertex3f(fx, fy, fz);
-   glTexCoord2f(0.0, 2.0);
-   glVertex3f(bx, by, bz);
-   glEnd();
+         Ax += 10 * dt;
+         Ay += 10 * dt;
+         Az += 10 * dt;
+      }
+   private:   
+      //---------------------------------------
+      // Function to draw 3D block
+      //---------------------------------------
+      void block(float xmin, float ymin, float zmin,
+               float xmax, float ymax, float zmax)
+      {
+         // Define 8 vertices
+         float ax = xmin, ay = ymin, az = zmax;
+         float bx = xmax, by = ymin, bz = zmax;
+         float cx = xmax, cy = ymax, cz = zmax;
+         float dx = xmin, dy = ymax, dz = zmax;
 
-   glBegin(GL_POLYGON);  // Max texture coord 3.0
-   glTexCoord2f(0.0, 0.0);
-   glVertex3f(gx, gy, gz);
-   glTexCoord2f(3.0, 0.0);
-   glVertex3f(cx, cy, cz);
-   glTexCoord2f(3.0, 3.0);
-   glVertex3f(dx, dy, dz);
-   glTexCoord2f(0.0, 3.0);
-   glVertex3f(hx, hy, hz);
-   glEnd();
-}
+         float ex = xmin, ey = ymin, ez = zmin;
+         float fx = xmax, fy = ymin, fz = zmin;
+         float gx = xmax, gy = ymax, gz = zmin;
+         float hx = xmin, hy = ymax, hz = zmin;
 
+         // Draw 6 faces
+         glBegin(GL_POLYGON);  // Max texture coord 1.0
+         glTexCoord2f(0.0, 0.0);
+         glVertex3f(ax, ay, az);
+         glTexCoord2f(1.0, 0.0);
+         glVertex3f(bx, by, bz);
+         glTexCoord2f(1.0, 1.0);
+         glVertex3f(cx, cy, cz);
+         glTexCoord2f(0.0, 1.0);
+         glVertex3f(dx, dy, dz);
+         glEnd();
+
+         glBegin(GL_POLYGON);  // Max texture coord 1.0
+         glTexCoord2f(0.0, 0.0);
+         glVertex3f(ex, ey, ez);
+         glTexCoord2f(1.0, 0.0);
+         glVertex3f(ax, ay, az);
+         glTexCoord2f(1.0, 1.0);
+         glVertex3f(dx, dy, dz);
+         glTexCoord2f(0.0, 1.0);
+         glVertex3f(hx, hy, hz);
+         glEnd();
+
+         glBegin(GL_POLYGON);  // Max texture coord 1.0
+         glTexCoord2f(0.0, 0.0);
+         glVertex3f(fx, fy, fz);
+         glTexCoord2f(1.0, 0.0);
+         glVertex3f(ex, ey, ez);
+         glTexCoord2f(1.0, 1.0);
+         glVertex3f(hx, hy, hz);
+         glTexCoord2f(0.0, 1.0);
+         glVertex3f(gx, gy, gz);
+         glEnd();
+
+         glBegin(GL_POLYGON);  // Max texture coord 1.0
+         glTexCoord2f(0.0, 0.0);
+         glVertex3f(bx, by, bz);
+         glTexCoord2f(1.0, 0.0);
+         glVertex3f(fx, fy, fz);
+         glTexCoord2f(1.0, 1.0);
+         glVertex3f(gx, gy, gz);
+         glTexCoord2f(0.0, 1.0);
+         glVertex3f(cx, cy, cz);
+         glEnd();
+
+         glBegin(GL_POLYGON);  // Max texture coord 3.0
+         glTexCoord2f(0.0, 0.0);
+         glVertex3f(ax, ay, az);
+         glTexCoord2f(2.0, 0.0);
+         glVertex3f(ex, ey, ez);
+         glTexCoord2f(2.0, 2.0);
+         glVertex3f(fx, fy, fz);
+         glTexCoord2f(0.0, 2.0);
+         glVertex3f(bx, by, bz);
+         glEnd();
+
+         glBegin(GL_POLYGON);  // Max texture coord 3.0
+         glTexCoord2f(0.0, 0.0);
+         glVertex3f(gx, gy, gz);
+         glTexCoord2f(3.0, 0.0);
+         glVertex3f(cx, cy, cz);
+         glTexCoord2f(3.0, 3.0);
+         glVertex3f(dx, dy, dz);
+         glTexCoord2f(0.0, 3.0);
+         glVertex3f(hx, hy, hz);
+         glEnd();
+      }
+};
+
+//vector of class Block objects
+std::vector<Block> blocks;
 
 //---------------------------------------
 // Init function for OpenGL
@@ -154,15 +206,17 @@ void init()
    glOrtho(-3.0, 3.0, -3.0, 3.0, -3.0, 3.0);
    glEnable(GL_DEPTH_TEST);
 
-   // Init texture
-   init_texture((char *)"textures/minecraftBlock.jpg", texture1, xdim, ydim);
-   init_texture((char *)"textures/minecraftStone.jpg", texture2, xdim, ydim);
+
    glEnable(GL_TEXTURE_2D);
    glTexParameterf(GL_TEXTURE_2D, GL_GENERATE_MIPMAP, GL_TRUE);
    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+   // Create some blocks
+   blocks.push_back(Block("textures/rock3.jpg", -2, 0, 0));
+   blocks.push_back(Block("textures/minecraftStone.jpg", 2, 0, 0));
 }
 
 //---------------------------------------
@@ -179,11 +233,10 @@ void display()
    glRotatef(yangle, 0.0, 1.0, 0.0);
    glRotatef(zangle, 0.0, 0.0, 1.0);
 
-   // Draw objects
-   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, xdim, ydim, 0, GL_RGB, GL_UNSIGNED_BYTE, texture1);
-   block(-1, -1, -1, 2, 2, 2);
-   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, xdim, ydim, 0, GL_RGB, GL_UNSIGNED_BYTE, texture2);
-   block(-2, -2, -2, 1, 1, 1);
+   for(size_t i = 0; i < blocks.size(); i++)
+   {
+      blocks[i].draw();
+   }
    glFlush();
 }
 
