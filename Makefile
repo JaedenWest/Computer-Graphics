@@ -8,7 +8,7 @@ LIB2 = libim/libim.a jpeg/libjpeg.a
 
 # define makefile targets
 CC = g++ -std=c++11 -Wall -Wno-deprecated-declarations -O3
-BIN =  Homework4 Homework3 Homework2 Homework1 balls balls2 balls3 balls4 basic bezier bitmap building building2 building3 callback clip clip2 city city2 cube cube2 cube3 cube4 cube5 curve disk draw_object gasket2d gasket3d gouraud keyboard lagrange line_split line_split2 line_test mandelbrot mandelbrot2 object object2 object3 object4 object5 office office2 office3 office4 pong rectangles render render2 render3 show_poly square square2 surface surface2 surface3 surface4 tetris tetris2 tetris3 texture texture2 texture3 texture4 texture5 tree triangle_split whack_a_mole 
+BIN =  Homework5 Homework4 Homework3 Homework2 Homework1 balls balls2 balls3 balls4 basic bezier bitmap building building2 building3 callback clip clip2 city city2 cube cube2 cube3 cube4 cube5 curve disk draw_object gasket2d gasket3d gouraud keyboard lagrange line_split line_split2 line_test mandelbrot mandelbrot2 object object2 object3 object4 object5 office office2 office3 office4 pong rectangles render render2 render3 show_poly square square2 surface surface2 surface3 surface4 tetris tetris2 tetris3 texture texture2 texture3 texture4 texture5 tree triangle_split whack_a_mole 
 
 all: $(LIB2) $(BIN)
 
@@ -227,3 +227,6 @@ Homework3: Homework3.cpp
 
 Homework4: Homework4.cpp $(LIB2)
 	$(CC) -o Homework4 Homework4.cpp $(LIB) $(LIB2)
+
+Homework5: Homework5.cpp $(LIB2)
+	$(CC) -o Homework5 Homework5.cpp $(LIB) $(LIB2)
