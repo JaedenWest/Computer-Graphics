@@ -1,6 +1,6 @@
 //---------------------------------------
 // Program: Homework5.h
-// Purpose: Ray Tracing
+// Purpose: Ray Tracing header file
 // Author:  Jaeden West
 // Date:    4/10/2026
 //---------------------------------------
@@ -32,7 +32,7 @@ public:
     void mult(ColorRGB c);
     // Used for combining multiple light sources or reflections
     void add(ColorRGB c);
-    void subtract(ColorRGB c);
+    void sub(ColorRGB c);
     // Makes sure values are between 0-1
     void clamp();
 };
@@ -57,6 +57,7 @@ class Vector3D
 public:
     // Where you are and where are you moving
     float vx, vy, vz;
+    void set(float x, float y, float z);
     // Used for debugging
     string print();
 
@@ -69,7 +70,7 @@ public:
     void mult(float c);
     // Used for combining multiple light sources or reflections
     void add(Vector3D v);
-    void subtract(Vector3D v);
+    void sub(Vector3D v);
 };
 
 class Ray3D
@@ -86,7 +87,7 @@ public:
     void set(Point3D p1, Point3D p2);
     // sample point along the ray at distance t from the origin
     // used for finding intersection points and reflection rays
-    Point3D getPoint(float t);
+    Point3D get_sample(float t);
 };
 // object in scene
 class Sphere3D
@@ -120,7 +121,7 @@ public:
     void SetLight(ColorRGB color, Vector3D dir);
     void SetObject(ColorRGB color, float ka, float kd, float ks, float kp);
     // gets the final color of the object being shaded
-    void GetShade(Point3D point, Vector3D normal, Point3D camera, ColorRGB &color);
+    void GetShade(Point3D point, Vector3D normal, ColorRGB &color);
 
 private:
     // Where the camera is

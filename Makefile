@@ -228,5 +228,5 @@ Homework3: Homework3.cpp
 Homework4: Homework4.cpp $(LIB2)
 	$(CC) -o Homework4 Homework4.cpp $(LIB) $(LIB2)
 
-Homework5: Homework5.cpp $(LIB2)
-	$(CC) -o Homework5 Homework5.cpp $(LIB) $(LIB2)
+Homework5: Homework5.cpp Homework5_classes.cpp $(LIB2)
+	$(CC) -o Homework5 Homework5_classes.cpp Homework5.cpp $(LIB) $(LIB2)
