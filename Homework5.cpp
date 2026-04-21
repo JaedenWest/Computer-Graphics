@@ -21,6 +21,7 @@
 #define YDIM 800
 unsigned char image[YDIM][XDIM][3];
 float position = 2;
+float angle = 0;
 string mode = "phong";
 
 //---------------------------------------
@@ -38,38 +39,60 @@ void ray_trace()
 
     // Define light source
     ColorRGB color;
-    color.set(200, 200, 200);
+    color.set(255, 255, 255);
     Vector3D dir;
     dir.set(-1, -1, -1);
     dir.normalize();
     shader.SetLight(color, dir);
 
     // Set object properties
-    color.set(200, 0, 100);
-    shader.SetObject(color, 0.3, 0.4, 0.4, 10);
+    ColorRGB yellow;
+    yellow.set(255, 255, 0);
+    shader.SetObject(yellow, 0.3, 0.4, 0.4, 2);
 
-    // Define test sphere
-    Sphere3D sphere;
-    Point3D center;
+    // sky
     ColorRGB sky;
-    center.set(0, 0, 3);
-    float radius = 2;
-    sphere.set(center, radius);
     sky.set(20, 50, 150);
 
+    // first sphere
+    Sphere3D sphere;
+    Point3D center;
+    center.set(0, 0, 3);
+    float radius = 1.2;
+    sphere.set(center, radius);
+
+    // second sphere
+    float sx = sin(angle) * 2;
+    float sz = cos(angle) * 2 + 3;
+    Sphere3D movingSphere;
+    Point3D movingCenter;
+    float tMoving;
+    Point3D pMoving;
+    Vector3D nMoving;
+    movingCenter.set(sx, -0.4, sz);
+    movingSphere.set(movingCenter, 0.5);
+
+    Plane3D plane;
+    Point3D planePoint;
+    planePoint.set(0, -2, 0);
+    Vector3D planeNormal;
+    planeNormal.set(0, 1, 0);
+    plane.set(planePoint, planeNormal);
     // Perform ray tracing
     for (int y = 0; y < YDIM; y++)
     {
         for (int x = 0; x < XDIM; x++)
         {
+
             // Clear image
             image[y][x][0] = sky.R;
             image[y][x][1] = sky.G;
             image[y][x][2] = sky.B;
+            float scale = 2.0;
 
-            // Define sample point on image plane
-            float xpos = (x - XDIM / 2) * 2.0 / XDIM;
-            float ypos = (y - YDIM / 2) * 2.0 / YDIM;
+            float xpos = (x - XDIM * 0.5f) * scale / XDIM;
+            float ypos = (y - YDIM * 0.5f) * scale / YDIM;
+
             Point3D point;
             point.set(xpos, ypos, 0);
 
@@ -78,35 +101,104 @@ void ray_trace()
             ray.set(camera, point);
 
             // Perform sphere intersection
-            Point3D planeHit;
-            Vector3D planeNormal;
-            bool hitPlane = false;
-            float tPlane = 0;
+            float tSphere, tPlane;
+            Point3D pSphere, pPlane;
+            Vector3D nSphere;
 
-            float denom = ray.d.vy;
-            if (sphere.get_intersection(ray, planeHit, planeNormal))
+            bool hitSphere = sphere.get_intersection(ray, tSphere, pSphere, nSphere);
+            bool hitPlane = plane.get_intersection(ray, tPlane, pPlane);
+            bool hitMoving = movingSphere.get_intersection(ray, tMoving, pMoving, nMoving);
+            // nothing hit
+            float tMin = 1e9;
+            // 1 = sphere 2 = moving sphere 3 = plane
+            int hitType = 0;
+            // choose the closest object
+
+            if (hitSphere && tSphere < tMin)
             {
-                // Display surface normal
+                tMin = tSphere;
+                hitType = 1;
+            }
+            if (hitMoving && tMoving < tMin)
+            {
+                tMin = tMoving;
+                hitType = 2;
+            }
+            if (hitPlane && tPlane < tMin)
+            {
+                tMin = tPlane;
+                hitType = 3;
+            }
+
+            ColorRGB shaded;
+            if (hitType == 1)
+            {
+                // display surface normal
                 if (mode == "normal")
                 {
-                    image[y][x][0] = 127 + planeNormal.vx * 127;
-                    image[y][x][1] = 127 + planeNormal.vy * 127;
-                    image[y][x][2] = 127 + planeNormal.vz * 127;
+                    image[y][x][0] = 127 + nSphere.vx * 127;
+                    image[y][x][1] = 127 + nSphere.vy * 127;
+                    image[y][x][2] = 127 + nSphere.vz * 127;
                 }
-
-                // Calculate Phong shade
-                if (mode == "phong")
+                else
                 {
-                    shader.GetShade(planeHit, planeNormal, color);
-                    image[y][x][0] = color.R;
-                    image[y][x][1] = color.G;
-                    image[y][x][2] = color.B;
+                    shader.GetShade(pSphere, nSphere, shaded);
+                    image[y][x][0] = shaded.R;
+                    image[y][x][1] = shaded.G;
+                    image[y][x][2] = shaded.B;
                 }
             }
+            else if (hitType == 2)
+            {
+                // display surface normal
+                if (mode == "normal")
+                {
+                    image[y][x][0] = 127 + nMoving.vx * 127;
+                    image[y][x][1] = 127 + nMoving.vy * 127;
+                    image[y][x][2] = 127 + nMoving.vz * 127;
+                }
+                else
+                {
+                    shader.GetShade(pMoving, nMoving, shaded);
+                    image[y][x][0] = shaded.R;
+                    image[y][x][1] = shaded.G;
+                    image[y][x][2] = shaded.B;
+                }
+            }
+            else if (hitType == 3)
+            {
+                int checkSize = 1;
+
+                float fx = pPlane.px * 0.3f;
+                float fz = pPlane.pz * 0.3f;
+
+                int checkX = (int)floor(fx / checkSize);
+                int checkZ = (int)floor(fz / checkSize);
+
+                bool even = ((checkX + checkZ) % 2 == 0);
+
+                ColorRGB checkerColor;
+
+                if (even)
+                {
+                    checkerColor.set(255, 255, 0);
+                }
+                else
+                {
+                    checkerColor.set(220, 40, 40);
+                }
+                image[y][x][0] = checkerColor.R;
+                image[y][x][1] = checkerColor.G;
+                image[y][x][2] = checkerColor.B;
+            }
+            else
+            {
+
+                image[y][x][0] = sky.R;
+                image[y][x][1] = sky.G;
+                image[y][x][2] = sky.B;
+            }
         }
-    }
-    bool intersectPlane(Ray3D ray, float &t, Point3D &hit)
-    {
     }
 }
 
@@ -128,6 +220,16 @@ void init()
 
     // Perform ray tracing
     ray_trace();
+}
+//---------------------------------------
+// Idle function for OpenGL
+//---------------------------------------
+void idle()
+{
+    angle += 0.02; // controls speed of motion
+
+    ray_trace(); // recompute image
+    glutPostRedisplay();
 }
 
 //---------------------------------------
@@ -183,6 +285,7 @@ int main(int argc, char *argv[])
     // Specify callback function
     glutDisplayFunc(display);
     glutKeyboardFunc(keyboard);
+    glutIdleFunc(idle);
     glutMainLoop();
     return 0;
 }

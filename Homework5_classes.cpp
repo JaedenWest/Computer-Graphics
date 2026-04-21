@@ -221,7 +221,7 @@ void Sphere3D::set(Point3D p, float r, Vector3D m)
 
 // intersection test
 // does this ray hit the sphere? if so, where and what is the normal vector at the intersection point?
-bool Sphere3D::get_intersection(Ray3D ray, Point3D &point, Vector3D &normal)
+bool Sphere3D::get_intersection(Ray3D ray, float &t, Point3D &point, Vector3D &normal)
 {
     // define oc vector
     Point3D g = center;
@@ -241,30 +241,20 @@ bool Sphere3D::get_intersection(Ray3D ray, Point3D &point, Vector3D &normal)
         // calculate rwo roots
         float root1 = (-B - sqrt(discriminant)) / (2 * A);
         float root2 = (-B + sqrt(discriminant)) / (2 * A);
-        float solution = 0;
 
-        // No positive roots found
-        if ((root1 < 0) && (root2 < 0))
+        float solution;
+
+        if (root1 > 0 && root2 > 0)
+            solution = (root1 < root2) ? root1 : root2;
+        else if (root1 > 0)
+            solution = root1;
+        else if (root2 > 0)
+            solution = root2;
+        else
             return false;
 
-        // One positive root
-        else if ((root1 < 0) && (root2 >= 0))
-            solution = root2;
-
-        // One positive root
-        else if ((root2 < 0) && (root1 >= 0))
-            solution = root1;
-
-        // Two positive roots
-        else if (root1 <= root2)
-            solution = root1;
-
-        // Two positive roots
-        else if (root2 <= root1)
-            solution = root2;
-
-        // Get intersection point
-        point = ray.get_sample(solution);
+        t = solution;
+        point = ray.get_sample(t);
 
         // Get surface normal
         normal.set(point.px - center.px, point.py - center.py, point.pz - center.pz);
@@ -272,6 +262,35 @@ bool Sphere3D::get_intersection(Ray3D ray, Point3D &point, Vector3D &normal)
         return true;
     }
     return false;
+}
+
+////////////////////////////////////
+//          Plane3D CLASS
+////////////////////////////////////
+
+void Plane3D::set(Point3D p, Vector3D n)
+{
+    point = p;
+    normal = n;
+    normal.normalize();
+}
+bool Plane3D::get_intersection(Ray3D ray, float &t, Point3D &hitPoint)
+{
+    float denom = normal.dot(ray.dir);
+
+    if (fabs(denom) < 0.0001)
+        return false;
+
+    // compute the vector from the ray origin to the plane
+    Vector3D diff;
+    diff.set(point.px - ray.point.px, point.py - ray.point.py, point.pz - ray.point.pz);
+    t = diff.dot(normal) / denom;
+    // if intersection is behind the camera
+    if (t < 0)
+        return false;
+    hitPoint = ray.get_sample(t);
+
+    return true;
 }
 
 Phong::Phong()
@@ -474,7 +493,8 @@ int test_main()
 
         Point3D p;
         Vector3D n;
-        if (!sphere.get_intersection(ray, p, n))
+        float t;
+        if (!sphere.get_intersection(ray, t, p, n))
             cout << "no intersection\n";
         else
         {

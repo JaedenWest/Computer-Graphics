@@ -105,7 +105,20 @@ public:
 
     // intersection test
     // does this ray hit the sphere? if so, where and what is the normal vector at the intersection point?
-    bool get_intersection(Ray3D ray, Point3D &point, Vector3D &normal);
+    bool get_intersection(Ray3D ray, float &t, Point3D &point, Vector3D &normal);
+};
+
+class Plane3D
+{
+public:
+    // used for debugging
+    string print();
+
+    Point3D point;
+    Vector3D normal;
+
+    void set(Point3D p, Vector3D n);
+    bool get_intersection(Ray3D ray, float &t, Point3D &hit);
 };
 
 // lighting system
