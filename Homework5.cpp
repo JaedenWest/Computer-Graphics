@@ -1,8 +1,8 @@
 //---------------------------------------
 // Program: Homework5.cpp
 // Purpose: Ray Tracing
-// Author:  Jaeden West
-// Date:    4/10/2026
+// Author: Jaeden West
+// Date: 4/10/2026
 //---------------------------------------
 
 #include <math.h>
@@ -19,65 +19,188 @@
 // Global variables
 #define XDIM 800
 #define YDIM 800
+
 unsigned char image[YDIM][XDIM][3];
 float position = 2;
 float angle = 0;
 string mode = "phong";
 
-//---------------------------------------
-// Init function for OpenGL
-//---------------------------------------
-void ray_trace()
+ColorRGB trace_ray(Ray3D ray, int depth)
 {
-    // Define Phong shader
+    ColorRGB sky;
+    sky.set(20, 50, 150);
+
+    if (depth >= 3)
+        return sky;
+
+    Sphere3D sphere;
+    Point3D center;
+    center.set(0, 0, 3);
+    sphere.set(center, 1.2);
+
+    float sx = sin(angle) * 2;
+    float sz = cos(angle) * 2 + 3;
+
+    Sphere3D movingSphere;
+    Point3D movingCenter;
+    movingCenter.set(sx, -0.4, sz);
+    movingSphere.set(movingCenter, 0.8);
+
+    Plane3D plane;
+    Point3D planePoint;
+    planePoint.set(0, -4, 0);
+
+    Vector3D planeNormal;
+    planeNormal.set(0, 1, 0);
+    plane.set(planePoint, planeNormal);
+
+    float tSphere, tMoving, tPlane;
+    Point3D pSphere, pMoving, pPlane;
+    Vector3D nSphere, nMoving;
+
+    bool hitSphere = sphere.get_intersection(ray, tSphere, pSphere, nSphere);
+    bool hitMoving = movingSphere.get_intersection(ray, tMoving, pMoving, nMoving);
+    bool hitPlane = plane.get_intersection(ray, tPlane, pPlane);
+
+    float tMin = 1e9;
+    int hitType = 0;
+
+    if (hitSphere && tSphere < tMin)
+    {
+        tMin = tSphere;
+        hitType = 1;
+    }
+    if (hitMoving && tMoving < tMin)
+    {
+        tMin = tMoving;
+        hitType = 2;
+    }
+    if (hitPlane && tPlane < tMin)
+    {
+        tMin = tPlane;
+        hitType = 3;
+    }
+
+    if (hitType == 0)
+        return sky;
+
+    Point3D hitPoint;
+    Vector3D normal;
+
+    ColorRGB objColor;
+    objColor.set(255, 255, 0);
+
+    if (hitType == 1)
+    {
+        hitPoint = pSphere;
+        normal = nSphere;
+    }
+    else if (hitType == 2)
+    {
+        hitPoint = pMoving;
+        normal = nMoving;
+    }
+    else if (hitType == 3)
+    {
+        hitPoint = pPlane;
+        normal = planeNormal;
+
+        bool inBounds =
+            (pPlane.px > -13 && pPlane.px < 50 &&
+             pPlane.pz > 0 && pPlane.pz < 75);
+
+        if (!inBounds)
+            return sky;
+
+        int checkSize = 1;
+        int checkX = (int)floor(pPlane.px / checkSize);
+        int checkZ = (int)floor(pPlane.pz / checkSize);
+
+        bool even = ((checkX + checkZ) % 2 == 0);
+
+        ColorRGB checkerColor;
+        if (even)
+            checkerColor.set(255, 255, 0);
+        else
+            checkerColor.set(220, 40, 40);
+
+        return checkerColor;
+    }
+
+    normal.normalize();
+
     Phong shader;
 
-    // Define camera point
     Point3D camera;
     camera.set(0, 0, -position);
     shader.SetCamera(camera);
 
-    // Define light source
-    ColorRGB color;
-    color.set(255, 255, 255);
-    Vector3D dir;
-    dir.set(-1, -1, -1);
-    dir.normalize();
-    shader.SetLight(color, dir);
+    ColorRGB lightColor;
+    lightColor.set(255, 255, 255);
 
-    // Set object properties
-    ColorRGB yellow;
-    yellow.set(255, 255, 0);
-    shader.SetObject(yellow, 0.3, 0.4, 0.4, 2);
+    Vector3D lightDir;
+    lightDir.set(-0.6, -0.8, -0.3);
+    lightDir.normalize();
 
+    shader.SetLight(lightColor, lightDir);
+    shader.SetObject(objColor, 0.3, 0.4, 0.4, 10);
+
+    ColorRGB phongColor;
+    shader.GetShade(hitPoint, normal, phongColor);
+
+    // Reflection
+    Vector3D D = ray.dir;
+    Vector3D N = normal;
+
+    float dot = D.dot(N);
+
+    Vector3D R;
+    R.vx = D.vx - 2 * dot * N.vx;
+    R.vy = D.vy - 2 * dot * N.vy;
+    R.vz = D.vz - 2 * dot * N.vz;
+    R.normalize();
+
+    Point3D offset;
+    offset.px = hitPoint.px + R.vx * 0.001f;
+    offset.py = hitPoint.py + R.vy * 0.001f;
+    offset.pz = hitPoint.pz + R.vz * 0.001f;
+
+    Point3D target;
+    target.px = offset.px + R.vx;
+    target.py = offset.py + R.vy;
+    target.pz = offset.pz + R.vz;
+
+    Ray3D reflectedRay;
+    reflectedRay.set(offset, target);
+
+    ColorRGB reflectedColor = trace_ray(reflectedRay, depth + 1);
+
+    float ks = 0.3f;
+
+    ColorRGB finalColor;
+    finalColor.R = phongColor.R + reflectedColor.R * ks;
+    finalColor.G = phongColor.G + reflectedColor.G * ks;
+    finalColor.B = phongColor.B + reflectedColor.B * ks;
+
+    finalColor.R = min(255.0f, max(0.0f, finalColor.R));
+    finalColor.G = min(255.0f, max(0.0f, finalColor.G));
+    finalColor.B = min(255.0f, max(0.0f, finalColor.B));
+
+    return finalColor;
+}
+void ray_trace()
+{
     // sky
     ColorRGB sky;
     sky.set(20, 50, 150);
 
-    // first sphere
-    Sphere3D sphere;
-    Point3D center;
-    center.set(0, 0, 3);
-    float radius = 1.2;
-    sphere.set(center, radius);
+    // camera
+    Point3D camera;
+    camera.set(0, 0, -position);
 
-    // second sphere
-    float sx = sin(angle) * 2;
-    float sz = cos(angle) * 2 + 3;
-    Sphere3D movingSphere;
-    Point3D movingCenter;
-    float tMoving;
-    Point3D pMoving;
-    Vector3D nMoving;
-    movingCenter.set(sx, -0.4, sz);
-    movingSphere.set(movingCenter, 0.5);
+    // image plane scale
+    float scale = 2.0;
 
-    Plane3D plane;
-    Point3D planePoint;
-    planePoint.set(0, -2, 0);
-    Vector3D planeNormal;
-    planeNormal.set(0, 1, 0);
-    plane.set(planePoint, planeNormal);
     // Perform ray tracing
     for (int y = 0; y < YDIM; y++)
     {
@@ -88,7 +211,6 @@ void ray_trace()
             image[y][x][0] = sky.R;
             image[y][x][1] = sky.G;
             image[y][x][2] = sky.B;
-            float scale = 2.0;
 
             float xpos = (x - XDIM * 0.5f) * scale / XDIM;
             float ypos = (y - YDIM * 0.5f) * scale / YDIM;
@@ -100,104 +222,11 @@ void ray_trace()
             Ray3D ray;
             ray.set(camera, point);
 
-            // Perform sphere intersection
-            float tSphere, tPlane;
-            Point3D pSphere, pPlane;
-            Vector3D nSphere;
+            ColorRGB col = trace_ray(ray, 0);
 
-            bool hitSphere = sphere.get_intersection(ray, tSphere, pSphere, nSphere);
-            bool hitPlane = plane.get_intersection(ray, tPlane, pPlane);
-            bool hitMoving = movingSphere.get_intersection(ray, tMoving, pMoving, nMoving);
-            // nothing hit
-            float tMin = 1e9;
-            // 1 = sphere 2 = moving sphere 3 = plane
-            int hitType = 0;
-            // choose the closest object
-
-            if (hitSphere && tSphere < tMin)
-            {
-                tMin = tSphere;
-                hitType = 1;
-            }
-            if (hitMoving && tMoving < tMin)
-            {
-                tMin = tMoving;
-                hitType = 2;
-            }
-            if (hitPlane && tPlane < tMin)
-            {
-                tMin = tPlane;
-                hitType = 3;
-            }
-
-            ColorRGB shaded;
-            if (hitType == 1)
-            {
-                // display surface normal
-                if (mode == "normal")
-                {
-                    image[y][x][0] = 127 + nSphere.vx * 127;
-                    image[y][x][1] = 127 + nSphere.vy * 127;
-                    image[y][x][2] = 127 + nSphere.vz * 127;
-                }
-                else
-                {
-                    shader.GetShade(pSphere, nSphere, shaded);
-                    image[y][x][0] = shaded.R;
-                    image[y][x][1] = shaded.G;
-                    image[y][x][2] = shaded.B;
-                }
-            }
-            else if (hitType == 2)
-            {
-                // display surface normal
-                if (mode == "normal")
-                {
-                    image[y][x][0] = 127 + nMoving.vx * 127;
-                    image[y][x][1] = 127 + nMoving.vy * 127;
-                    image[y][x][2] = 127 + nMoving.vz * 127;
-                }
-                else
-                {
-                    shader.GetShade(pMoving, nMoving, shaded);
-                    image[y][x][0] = shaded.R;
-                    image[y][x][1] = shaded.G;
-                    image[y][x][2] = shaded.B;
-                }
-            }
-            else if (hitType == 3)
-            {
-                int checkSize = 1;
-
-                float fx = pPlane.px * 0.3f;
-                float fz = pPlane.pz * 0.3f;
-
-                int checkX = (int)floor(fx / checkSize);
-                int checkZ = (int)floor(fz / checkSize);
-
-                bool even = ((checkX + checkZ) % 2 == 0);
-
-                ColorRGB checkerColor;
-
-                if (even)
-                {
-                    checkerColor.set(255, 255, 0);
-                }
-                else
-                {
-                    checkerColor.set(220, 40, 40);
-                }
-                image[y][x][0] = checkerColor.R;
-                image[y][x][1] = checkerColor.G;
-                image[y][x][2] = checkerColor.B;
-            }
-            else
-            {
-
-                image[y][x][0] = sky.R;
-                image[y][x][1] = sky.G;
-                image[y][x][2] = sky.B;
-            }
+            image[y][x][0] = col.R;
+            image[y][x][1] = col.G;
+            image[y][x][2] = col.B;
         }
     }
 }
@@ -226,7 +255,7 @@ void init()
 //---------------------------------------
 void idle()
 {
-    angle += 0.02; // controls speed of motion
+    angle += 0.03; // controls speed of motion
 
     ray_trace(); // recompute image
     glutPostRedisplay();
