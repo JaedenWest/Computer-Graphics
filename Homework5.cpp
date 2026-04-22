@@ -23,12 +23,48 @@
 unsigned char image[YDIM][XDIM][3];
 float position = 2;
 float angle = 0;
+float cubeAngle = angle;
+float radius = 0.8f;
 string mode = "phong";
 
+Cube3D cube1;
+Cube3D cube2;
 ColorRGB trace_ray(Ray3D ray, int depth)
 {
     ColorRGB sky;
     sky.set(20, 50, 150);
+
+    struct Material
+    {
+        ColorRGB color;
+        float ka, kd, ks, n;
+    };
+
+    Material sphereMat, movingMat, cube1Mat, cube2Mat;
+
+    sphereMat.color.set(0, 255, 0);
+    sphereMat.ka = 0.2;
+    sphereMat.kd = 0.6;
+    sphereMat.ks = 0.4;
+    sphereMat.n = 20;
+
+    movingMat.color.set(255, 255, 0);
+    movingMat.ka = 0.3;
+    movingMat.kd = 0.7;
+    movingMat.ks = 0.3;
+    movingMat.n = 20;
+
+    cube1Mat.color.set(255, 0, 0);
+    cube1Mat.ka = 0.3;
+    cube1Mat.kd = 0.5;
+    cube1Mat.ks = 0.5;
+    cube1Mat.n = 30;
+
+    cube2Mat.color.set(0, 0, 255);
+    cube2Mat.ka = 0.3;
+    cube2Mat.kd = 0.6;
+    cube2Mat.ks = 0.4;
+    cube2Mat.n = 15;
 
     if (depth >= 3)
         return sky;
@@ -58,9 +94,37 @@ ColorRGB trace_ray(Ray3D ray, int depth)
     Point3D pSphere, pMoving, pPlane;
     Vector3D nSphere, nMoving;
 
+    // cube 1 center motion
+    float c1x = -1.0f + cos(cubeAngle) * radius;
+    float c1z = 3.0f + sin(cubeAngle) * radius;
+
+    // cube 2 center motion (opposite side)
+    float c2x = 1.0f + cos(cubeAngle + 3.14f) * radius;
+    float c2z = 3.0f + sin(cubeAngle + 3.14f) * radius;
+
+    float size = 0.3f;
+    // cube 1
+    Point3D c1Min, c1Max;
+    c1Min.set(c1x - size, 1.4f, c1z - size);
+    c1Max.set(c1x + size, 2.0f, c1z + size);
+    cube1.set(c1Min, c1Max);
+
+    // cube 2
+    Point3D c2Min, c2Max;
+    c2Min.set(c2x - size, 1.4f, c2z - size);
+    c2Max.set(c2x + size, 2.0f, c2z + size);
+    cube2.set(c2Min, c2Max);
+
     bool hitSphere = sphere.get_intersection(ray, tSphere, pSphere, nSphere);
     bool hitMoving = movingSphere.get_intersection(ray, tMoving, pMoving, nMoving);
     bool hitPlane = plane.get_intersection(ray, tPlane, pPlane);
+
+    float tCube1, tCube2;
+    Point3D pCube1, pCube2;
+    Vector3D nCube1, nCube2;
+
+    bool hitCube1 = cube1.get_intersection(ray, tCube1, pCube1, nCube1);
+    bool hitCube2 = cube2.get_intersection(ray, tCube2, pCube2, nCube2);
 
     float tMin = 1e9;
     int hitType = 0;
@@ -80,13 +144,23 @@ ColorRGB trace_ray(Ray3D ray, int depth)
         tMin = tPlane;
         hitType = 3;
     }
+    if (hitCube1 && tCube1 < tMin)
+    {
+        tMin = tCube1;
+        hitType = 4;
+    }
 
+    if (hitCube2 && tCube2 < tMin)
+    {
+        tMin = tCube2;
+        hitType = 5;
+    }
     if (hitType == 0)
         return sky;
 
     Point3D hitPoint;
     Vector3D normal;
-
+    Material mat;
     ColorRGB objColor;
     objColor.set(255, 255, 0);
 
@@ -94,16 +168,19 @@ ColorRGB trace_ray(Ray3D ray, int depth)
     {
         hitPoint = pSphere;
         normal = nSphere;
+        mat = sphereMat;
     }
     else if (hitType == 2)
     {
         hitPoint = pMoving;
         normal = nMoving;
+        mat = movingMat;
     }
     else if (hitType == 3)
     {
         hitPoint = pPlane;
         normal = planeNormal;
+        normal.normalize();
 
         bool inBounds =
             (pPlane.px > -13 && pPlane.px < 50 &&
@@ -118,13 +195,27 @@ ColorRGB trace_ray(Ray3D ray, int depth)
 
         bool even = ((checkX + checkZ) % 2 == 0);
 
-        ColorRGB checkerColor;
         if (even)
-            checkerColor.set(255, 255, 0);
+            mat.color.set(255, 255, 0);
         else
-            checkerColor.set(220, 40, 40);
+            mat.color.set(220, 40, 40);
 
-        return checkerColor;
+        mat.ka = 0.3;
+        mat.kd = 0.7;
+        mat.ks = 0.3;
+        mat.n = 10;
+    }
+    else if (hitType == 4)
+    {
+        hitPoint = pCube1;
+        normal = nCube1;
+        mat = cube1Mat;
+    }
+    else if (hitType == 5)
+    {
+        hitPoint = pCube2;
+        normal = nCube2;
+        mat = cube2Mat;
     }
 
     normal.normalize();
@@ -139,11 +230,11 @@ ColorRGB trace_ray(Ray3D ray, int depth)
     lightColor.set(255, 255, 255);
 
     Vector3D lightDir;
-    lightDir.set(-0.6, -0.8, -0.3);
+    lightDir.set(-0.6, 0.8, -0.3);
     lightDir.normalize();
 
     shader.SetLight(lightColor, lightDir);
-    shader.SetObject(objColor, 0.3, 0.4, 0.4, 10);
+    shader.SetObject(mat.color, mat.ka, mat.kd, mat.ks, mat.n);
 
     ColorRGB phongColor;
     shader.GetShade(hitPoint, normal, phongColor);
@@ -175,7 +266,7 @@ ColorRGB trace_ray(Ray3D ray, int depth)
 
     ColorRGB reflectedColor = trace_ray(reflectedRay, depth + 1);
 
-    float ks = 0.3f;
+    float ks = mat.ks;
 
     ColorRGB finalColor;
     finalColor.R = phongColor.R + reflectedColor.R * ks;
@@ -255,7 +346,8 @@ void init()
 //---------------------------------------
 void idle()
 {
-    angle += 0.03; // controls speed of motion
+    cubeAngle += 0.04; // controls cube speed
+    angle += 0.04;     // controls spheres speed
 
     ray_trace(); // recompute image
     glutPostRedisplay();

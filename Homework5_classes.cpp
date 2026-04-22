@@ -293,6 +293,116 @@ bool Plane3D::get_intersection(Ray3D ray, float &t, Point3D &hitPoint)
     return true;
 }
 
+////////////////////////////////////
+//          Cube3D CLASS
+////////////////////////////////////
+void Cube3D::set(Point3D minPoint, Point3D maxPoint)
+{
+    minP = minPoint;
+    maxP = maxPoint;
+}
+
+bool Cube3D::get_intersection(Ray3D ray, float &t, Point3D &hitPoint, Vector3D &normal)
+{
+    float tmin = -1e9;
+    float tmax = 1e9;
+
+    Point3D rayOrigin = ray.point;
+    Vector3D rayDirection = ray.dir;
+
+    // X
+    if (fabs(rayDirection.vx) < 1e-6)
+    {
+        if (rayOrigin.px < minP.px || rayOrigin.px > maxP.px)
+            return false;
+    }
+    else
+    {
+        float tMinX = (minP.px - rayOrigin.px) / rayDirection.vx;
+        float tMaxX = (maxP.px - rayOrigin.px) / rayDirection.vx;
+
+        if (tMinX > tMaxX)
+            std::swap(tMinX, tMaxX);
+
+        tmin = std::max(tmin, tMinX);
+        tmax = std::min(tmax, tMaxX);
+
+        if (tmin > tmax)
+            return false;
+    }
+
+    // Y
+    if (fabs(rayDirection.vy) < 1e-6)
+    {
+        if (rayOrigin.py < minP.py || rayOrigin.py > maxP.py)
+            return false;
+    }
+    else
+    {
+        float tMinY = (minP.py - rayOrigin.py) / rayDirection.vy;
+        float tMaxY = (maxP.py - rayOrigin.py) / rayDirection.vy;
+
+        if (tMinY > tMaxY)
+            std::swap(tMinY, tMaxY);
+
+        tmin = std::max(tmin, tMinY);
+        tmax = std::min(tmax, tMaxY);
+
+        if (tmin > tmax)
+            return false;
+    }
+
+    // Z
+    if (fabs(rayDirection.vz) < 1e-6)
+    {
+        if (rayOrigin.pz < minP.pz || rayOrigin.pz > maxP.pz)
+            return false;
+    }
+    else
+    {
+        float tMinZ = (minP.pz - rayOrigin.pz) / rayDirection.vz;
+        float tMaxZ = (maxP.pz - rayOrigin.pz) / rayDirection.vz;
+
+        if (tMinZ > tMaxZ)
+            std::swap(tMinZ, tMaxZ);
+
+        tmin = std::max(tmin, tMinZ);
+        tmax = std::min(tmax, tMaxZ);
+
+        if (tmin > tmax)
+            return false;
+    }
+
+    // ---------------- final hit test ----------------
+    if (tmax < 0)
+        return false;
+
+    t = tmin;
+
+    // compute hit point
+    hitPoint.px = rayOrigin.px + t * rayDirection.vx;
+    hitPoint.py = rayOrigin.py + t * rayDirection.vy;
+    hitPoint.pz = rayOrigin.pz + t * rayDirection.vz;
+
+    // ---------------- normal calculation ----------------
+    float offset = 1e-3;
+
+    if (fabs(hitPoint.px - minP.px) < offset)
+        normal.set(-1, 0, 0);
+    else if (fabs(hitPoint.px - maxP.px) < offset)
+        normal.set(1, 0, 0);
+    else if (fabs(hitPoint.py - minP.py) < offset)
+        normal.set(0, -1, 0);
+    else if (fabs(hitPoint.py - maxP.py) < offset)
+        normal.set(0, 1, 0);
+    else if (fabs(hitPoint.pz - minP.pz) < offset)
+        normal.set(0, 0, -1);
+    else
+        normal.set(0, 0, 1);
+
+    return true;
+}
+
 Phong::Phong()
 {
     CameraPos.set(0, 0, 0);

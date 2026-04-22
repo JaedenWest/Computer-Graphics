@@ -121,6 +121,17 @@ public:
     bool get_intersection(Ray3D ray, float &t, Point3D &hit);
 };
 
+class Cube3D
+{
+public:
+    Point3D minP; // bottom-left-back corner
+    Point3D maxP; // top-right-front corner
+
+    void set(Point3D minPoint, Point3D maxPoint);
+
+    bool get_intersection(Ray3D ray, float &t, Point3D &hitPoint, Vector3D &normal);
+};
+
 // lighting system
 class Phong
 {
